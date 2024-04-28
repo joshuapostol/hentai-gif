@@ -1,40 +1,38 @@
 const express = require('express');
-const fs = require('fs');
-const axios = require('axios');
-
+const { Brainly } = require("brainly-scraper-v2");
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
 
-app.get('/', (req, res) => {
-  res.send('Welcome to Joshua Apostol API');
-});
+Brainly.initialize();
+const brain = new Brainly("ph");
 
-app.get('/random-gif', async (req, res) => {
+app.get('/brainly', async (req, res) => {
   try {
-    const response = await axios.get('http://localhost:3000/random-gif-links');
-    const gifLinks = response.data.gifLinks;
-    const randomIndex = Math.floor(Math.random() * gifLinks.length);
-    const randomGif = gifLinks[randomIndex];
-    res.json({ gifLink: randomGif });
+    const query = req.query.q;
+    const countryCode = req.query.country || "ph";
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
+    }
+
+    let results = await brain.searchWithMT(query, countryCode);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'No answer found. Please try another query.' });
+    }
+
+    let randomIndex = Math.floor(Math.random() * results.length);
+    let randomAnswer = results[randomIndex].answers[0].content;
+    
+    const formattedAnswer = randomAnswer.replace(/<(?:.|\n)*?>/gm, ''); 
+
+    res.json({ answer: formattedAnswer });
   } catch (error) {
-    console.error('Error fetching random GIF:', error);
-    res.status(500).json({ error: 'Error fetching random GIF' });
+    console.error(error);
+    res.status(500).json({ error: 'An error occurred while processing your request' });
   }
 });
 
-app.get('/random-gif-links', (req, res) => {
-  try {
-    fs.readFile('random_gif.json', 'utf8', (err, data) => {
-      if (err) throw err;
-      const jsonData = JSON.parse(data);
-      res.json(jsonData);
-    });
-  } catch (error) {
-    console.error('Error fetching random GIF links:', error);
-    res.status(500).json({ error: 'Error fetching random GIF links' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server is listening at http://localhost:${port}`);
 });
